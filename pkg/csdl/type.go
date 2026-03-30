@@ -14,6 +14,7 @@ type Type struct {
 	Name         string
 	Namespace    string
 	BaseType     string
+	Annotations  []*Annotation
 	Properties   map[string]PropType
 	Members      map[string]MemberType
 	Wildcard     bool              // true if this is a wildcard type, like Attributes
@@ -21,12 +22,13 @@ type Type struct {
 	ComplexType  bool
 }
 
-func NewTypeFromEntityType(entityType EntityType, nameSpace string) *Type {
+func NewTypeFromEntityType(entityType *EntityType, nameSpace string) *Type {
 	myType := &Type{
 		Name:        entityType.Name,
 		Namespace:   nameSpace,
 		Properties:  make(map[string]PropType),
 		BaseType:    entityType.BaseType,
+		Annotations: entityType.Annotation,
 		ComplexType: false,
 	}
 	for _, property := range entityType.Property {
@@ -35,9 +37,10 @@ func NewTypeFromEntityType(entityType EntityType, nameSpace string) *Type {
 			canBeNull = *property.Nullable
 		}
 		propType := PropType{
-			Navigation: false,
-			Type:       property.Type,
-			CanBeNull:  canBeNull,
+			Navigation:  false,
+			Type:        property.Type,
+			CanBeNull:   canBeNull,
+			Annotations: property.Annotation,
 		}
 		myType.Properties[property.Name] = propType
 	}
@@ -47,21 +50,33 @@ func NewTypeFromEntityType(entityType EntityType, nameSpace string) *Type {
 			canBeNull = *navProp.Nullable
 		}
 		propType := PropType{
-			Navigation: true,
-			Type:       navProp.Type,
-			CanBeNull:  canBeNull,
+			Navigation:  true,
+			Excerpt:     IsExcerpt(navProp.Annotation),
+			Type:        navProp.Type,
+			CanBeNull:   canBeNull,
+			Annotations: navProp.Annotation,
 		}
 		myType.Properties[navProp.Name] = propType
 	}
 	return myType
 }
 
-func NewTypeFromComplexType(complexType ComplexType, nameSpace string) *Type {
+func IsExcerpt(annotations []*Annotation) bool {
+	for _, annotation := range annotations {
+		if annotation.Term == "Redfish.ExcerptCopy" {
+			return true
+		}
+	}
+	return false
+}
+
+func NewTypeFromComplexType(complexType *ComplexType, nameSpace string) *Type {
 	myType := &Type{
 		Name:        complexType.Name,
 		Namespace:   nameSpace,
 		Properties:  make(map[string]PropType),
 		BaseType:    complexType.BaseType,
+		Annotations: complexType.Annotation,
 		ComplexType: true,
 	}
 	for _, property := range complexType.Property {
@@ -70,9 +85,10 @@ func NewTypeFromComplexType(complexType ComplexType, nameSpace string) *Type {
 			canBeNull = *property.Nullable
 		}
 		propType := PropType{
-			Navigation: false,
-			Type:       property.Type,
-			CanBeNull:  canBeNull,
+			Navigation:  false,
+			Type:        property.Type,
+			CanBeNull:   canBeNull,
+			Annotations: property.Annotation,
 		}
 		myType.Properties[property.Name] = propType
 	}
@@ -82,9 +98,11 @@ func NewTypeFromComplexType(complexType ComplexType, nameSpace string) *Type {
 			canBeNull = *navProp.Nullable
 		}
 		propType := PropType{
-			Navigation: true,
-			Type:       navProp.Type,
-			CanBeNull:  canBeNull,
+			Navigation:  true,
+			Excerpt:     IsExcerpt(navProp.Annotation),
+			Type:        navProp.Type,
+			CanBeNull:   canBeNull,
+			Annotations: navProp.Annotation,
 		}
 		myType.Properties[navProp.Name] = propType
 	}
@@ -104,15 +122,17 @@ func NewTypeFromComplexType(complexType ComplexType, nameSpace string) *Type {
 	return myType
 }
 
-func NewTypeFromEnumType(enumType EnumType, nameSpace string) *Type {
+func NewTypeFromEnumType(enumType *EnumType, nameSpace string) *Type {
 	myType := &Type{
-		Name:      enumType.Name,
-		Namespace: nameSpace,
-		Members:   make(map[string]MemberType),
+		Name:        enumType.Name,
+		Namespace:   nameSpace,
+		Annotations: enumType.Annotation,
+		Members:     make(map[string]MemberType),
 	}
 	for _, member := range enumType.Member {
 		memType := MemberType{
-			Name: member.Name,
+			Name:        member.Name,
+			Annotations: member.Annotation,
 		}
 		if member.Value != nil {
 			memType.Value = *member.Value
@@ -324,10 +344,12 @@ func (t *Type) GoTypeName() string {
 }
 
 type PropType struct {
-	Navigation bool
-	Type       string
-	CanBeNull  bool
-	JsonName   string
+	Navigation  bool
+	Excerpt     bool
+	Type        string
+	CanBeNull   bool
+	JsonName    string
+	Annotations []*Annotation
 }
 
 func (p *PropType) ToField(name string, types map[string]*Type, replacements map[string]string) *ast.Field {
@@ -478,6 +500,7 @@ func doTypeSearch(typeName string, types map[string]*Type) (*Type, bool) {
 }
 
 type MemberType struct {
-	Name  string
-	Value string
+	Name        string
+	Value       string
+	Annotations []*Annotation
 }
