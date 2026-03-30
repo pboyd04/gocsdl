@@ -14,7 +14,7 @@ type File struct {
 	types   map[string]*Type
 }
 
-func NewFile(packageName string) *File {
+func NewFile(packageName string) (*File, error) {
 	ret := &File{
 		w:       bytes.NewBuffer(nil),
 		fileSet: token.NewFileSet(),
@@ -25,9 +25,9 @@ func NewFile(packageName string) *File {
 	}
 	err := format.Node(ret.w, ret.fileSet, fileToken)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return ret
+	return ret, nil
 }
 
 func (f *File) AddType(t *Type) error {

@@ -48,7 +48,11 @@ func main() {
 			prefix := splitNamespacePrefix(name)
 			file, ok := files[prefix]
 			if !ok {
-				file = csdl.NewFile(*packageName)
+				file, err = csdl.NewFile(*packageName)
+				if err != nil {
+					fmt.Printf("Error creating file %s: %s\n", prefix, err)
+					os.Exit(1)
+				}
 				files[prefix] = file
 			}
 			err = file.AddType(t)
