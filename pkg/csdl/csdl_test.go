@@ -146,8 +146,8 @@ func TestGetChildren(t *testing.T) {
 func BenchmarkGetChildren(b *testing.B) {
 	for _, tc := range GetGetChildrenTestCases() {
 		b.Run(tc.Name, func(b *testing.B) {
+			b.ReportAllocs()
 			for b.Loop() {
-				b.ReportAllocs()
 				_ = tc.Type.GetChildren()
 			}
 		})
