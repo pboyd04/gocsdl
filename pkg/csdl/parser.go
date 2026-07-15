@@ -2,7 +2,6 @@ package csdl
 
 import (
 	"cmp"
-	"encoding/xml"
 	"io"
 	"maps"
 	"os"
@@ -21,6 +20,7 @@ type Parser struct {
 	localReferenceSearch []string
 	externalCache        ExternalCache
 	skipFileRead         bool
+	decodeXML            xmlDecodeFunc
 }
 
 type ParsedData struct {
@@ -66,6 +66,7 @@ func NewParser() *Parser {
 		Files:        make(map[string]io.ReadCloser),
 		Replacements: make(map[string]string),
 		Parsed:       make(map[string]*ParsedData),
+		decodeXML:    decodeGeneratedCSDL,
 	}
 }
 
@@ -130,9 +131,8 @@ func (p *Parser) Parse(opts ...ParseOption) (map[string]*Type, error) {
 				continue
 			}
 		}
-		dec := xml.NewDecoder(reader)
 		edmx := Edmx{}
-		err := dec.Decode(&edmx)
+		err := p.decode(reader, &edmx)
 		if err != nil {
 			return nil, err
 		}
@@ -158,6 +158,14 @@ func (p *Parser) Parse(opts ...ParseOption) (map[string]*Type, error) {
 		p.Files[externalFileName] = externalFile
 	}
 	return types, nil
+}
+
+func (p *Parser) decode(reader io.Reader, value any) error {
+	decode := p.decodeXML
+	if decode == nil {
+		decode = decodeGeneratedCSDL
+	}
+	return decode(reader, value)
 }
 
 func (p *Parser) makeTypesFromSchema(schema *Schema, types map[string]*Type) {
@@ -236,9 +244,8 @@ func (p *Parser) addReferenceFile(fileName string) (io.ReadCloser, error) {
 		filePath := filepath.Join(dir, fileName)
 		file, err := os.Open(filePath)
 		if err == nil {
-			dec := xml.NewDecoder(file)
 			edmx := Edmx{}
-			err = dec.Decode(&edmx)
+			err = p.decode(file, &edmx)
 			if err != nil {
 				return nil, err
 			}

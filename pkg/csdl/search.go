@@ -7,9 +7,10 @@ import (
 )
 
 type Searcher struct {
-	parser      *Parser
-	schemaCache sync.Map // map[string]*Schema
-	schemaCount int
+	parser          *Parser
+	schemaCache     sync.Map // map[string]*Schema
+	schemaCount     int
+	schemaCacheOnce sync.Once
 }
 
 type Searchable interface {
@@ -24,10 +25,22 @@ type SchmeaChild interface {
 
 func NewSearcher(parser *Parser) *Searcher {
 	return &Searcher{
-		parser:      parser,
-		schemaCache: sync.Map{},
-		schemaCount: 0,
+		parser: parser,
 	}
+}
+
+// initSchemaCache populates the schema cache exactly once, thread-safely.
+func (s *Searcher) initSchemaCache() {
+	s.schemaCacheOnce.Do(func() {
+		count := 0
+		for _, parsed := range s.parser.Parsed {
+			for _, schema := range parsed.Edmx.DataServices.Schema {
+				s.schemaCache.Store(schema.Namespace, schema)
+				count++
+			}
+		}
+		s.schemaCount = count
+	})
 }
 
 func (s *Searcher) GetFiles() map[string]*Edmx {
@@ -60,15 +73,14 @@ func (s *Searcher) GetAnnotations(name string) []*Annotation {
 }
 
 func (s *Searcher) GetAllSchemas() []*Schema {
+	s.initSchemaCache()
 	ret := make([]*Schema, 0, s.schemaCount)
 	for _, parsed := range s.parser.Parsed {
 		if parsed.IsReference {
 			continue
 		}
 		edmx := parsed.Edmx
-		for _, schema := range edmx.DataServices.Schema {
-			ret = append(ret, schema)
-		}
+		ret = append(ret, edmx.DataServices.Schema...)
 	}
 	return ret
 }
@@ -77,6 +89,7 @@ func (s *Searcher) GetSchemas(name string) []*Schema {
 	if name == "" {
 		return s.GetAllSchemas()
 	}
+	s.initSchemaCache()
 	ret := make([]*Schema, 0, s.schemaCount)
 	for _, parsed := range s.parser.Parsed {
 		if parsed.IsReference {
@@ -310,13 +323,7 @@ func (s *Searcher) GetPath(searchable Searchable) (string, string) {
 }
 
 func (s *Searcher) GetSchemaByNamespace(namespace string) *Schema {
-	if s.schemaCount == 0 {
-		for _, parsed := range s.parser.Parsed {
-			for _, schema := range parsed.Edmx.DataServices.Schema {
-				s.schemaCache.Store(schema.Namespace, schema)
-			}
-		}
-	}
+	s.initSchemaCache()
 	value, ok := s.schemaCache.Load(namespace)
 	if !ok {
 		return nil
