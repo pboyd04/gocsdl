@@ -74,6 +74,7 @@ type Action struct {
 	IsBound    bool          `xml:"IsBound,attr"`
 	Annotation []*Annotation `xml:"Annotation"`
 	Parameter  []*Parameter  `xml:"Parameter"`
+	ReturnType *ReturnType   `xml:"ReturnType"`
 	Other      []any         `xml:",any"`
 }
 
@@ -81,6 +82,9 @@ func (a Action) GetChildren() []Searchable {
 	ret := make([]Searchable, 0, 100)
 	ret = utilAppendTypeAsSearchable(ret, a.Annotation...)
 	ret = utilAppendTypeAsSearchable(ret, a.Parameter...)
+	if a.ReturnType != nil {
+		ret = append(ret, a.ReturnType)
+	}
 	return ret
 }
 
@@ -89,7 +93,7 @@ func (a Action) GetName() string {
 }
 
 func (a Action) GetXPath() string {
-	return a.Name
+	return "Action[@Name='" + a.Name + "']"
 }
 
 type Annotation struct {
@@ -401,4 +405,22 @@ type PropertyValue struct {
 	Property string `xml:"Property,attr"`
 	Bool     bool   `xml:"Bool,attr"`
 	Other    []any  `xml:",any"`
+}
+
+type ReturnType struct {
+	Type string `xml:"Type,attr"`
+}
+
+var _ Searchable = (*ReturnType)(nil)
+
+func (r ReturnType) GetChildren() []Searchable {
+	return nil
+}
+
+func (r ReturnType) GetName() string {
+	return r.Type
+}
+
+func (r ReturnType) GetXPath() string {
+	return "ReturnType[@Type='" + r.Type + "']"
 }

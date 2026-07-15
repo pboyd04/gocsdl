@@ -34,6 +34,9 @@ func (m *mockReadCloser) Reset() {
 }
 
 const (
+	computerSystemV1File      = "ComputerSystem_v1.xml"
+	computerSystemV1TypeCount = 434
+
 	externalRefXML = `<?xml version="1.0" encoding="UTF-8"?>
 <edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
 	<edmx:DataServices>
@@ -55,6 +58,15 @@ const (
 	</edmx:DataServices>
 </edmx:Edmx>`
 )
+
+func readComputerSystemV1(tb testing.TB) string {
+	tb.Helper()
+	data, err := os.ReadFile(computerSystemV1File)
+	if err != nil {
+		tb.Fatalf("reading %s: %v", computerSystemV1File, err)
+	}
+	return string(data)
+}
 
 func TestParserSimpleOperations(t *testing.T) {
 	t.Parallel()
@@ -475,6 +487,24 @@ func TestParserParseNoExternal(t *testing.T) {
 			helperCompareTypesToExpected(t, types, tt.wantTypeDefs, tt.wantAbsent)
 		})
 	}
+}
+
+func TestParserParseComputerSystemV1(t *testing.T) {
+	t.Parallel()
+	parser := csdl.NewParser()
+	parser.AddFile(computerSystemV1File, newMockReadCloser(readComputerSystemV1(t)))
+
+	types, err := parser.Parse()
+	require.NoError(t, err)
+	require.Len(t, types, computerSystemV1TypeCount)
+
+	computerSystem := types["ComputerSystem.v1_28_0.ComputerSystem"]
+	require.NotNil(t, computerSystem)
+	assert.Equal(t, "ComputerSystem.v1_27_1.ComputerSystem", computerSystem.BaseType)
+	assert.Equal(t, "ComputerSystem.v1_28_0.Virtualization", computerSystem.Properties["Virtualization"].Type)
+
+	assert.Contains(t, types, "ComputerSystem.v1_28_0.BootImageParameters")
+	assert.Contains(t, types, "ComputerSystem.v1_28_0.ImageChecksumAlgorithm")
 }
 
 func TestParserParseLocalRefs(t *testing.T) {
@@ -1059,6 +1089,24 @@ func BenchmarkParserParse(b *testing.B) {
 				file.Reset()
 			}
 		})
+	}
+}
+
+func BenchmarkParserParseComputerSystemV1(b *testing.B) {
+	file := newMockReadCloser(readComputerSystemV1(b))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		parser := csdl.NewParser()
+		parser.AddFile(computerSystemV1File, file)
+		types, err := parser.Parse()
+		if err != nil {
+			b.Fatalf("Parse() returned unexpected error: %v", err)
+		}
+		if len(types) != computerSystemV1TypeCount {
+			b.Fatalf("Parse() returned %d types, want %d", len(types), computerSystemV1TypeCount)
+		}
+		file.Reset()
 	}
 }
 

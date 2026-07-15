@@ -269,6 +269,34 @@ func TestSearcherGetActions(t *testing.T) {
 	}
 }
 
+func TestSearcherGetsPathForActionReturnType(t *testing.T) {
+	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+	<edmx:DataServices>
+		<Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="Test.v1_0_0">
+			<Action Name="GetWidgets">
+				<ReturnType Type="Collection(Test.v1_0_0.Widget)"/>
+			</Action>
+		</Schema>
+	</edmx:DataServices>
+</edmx:Edmx>`
+
+	searcher := csdl.NewSearcher(createTestParser(xmlData))
+	actions := searcher.GetActions("GetWidgets")
+	if len(actions) != 1 || actions[0].ReturnType == nil {
+		t.Fatal("parsed action did not contain its return type")
+	}
+
+	fileName, xpath := searcher.GetPath(actions[0].ReturnType)
+	if fileName != "test.xml" {
+		t.Errorf("GetPath returned file %q, want test.xml", fileName)
+	}
+	wantXPath := "/edmx:Edmx/edmx:DataServices/Schema[@Namespace='Test.v1_0_0']/Action[@Name='GetWidgets']/ReturnType[@Type='Collection(Test.v1_0_0.Widget)']"
+	if xpath != wantXPath {
+		t.Errorf("GetPath returned %q, want %q", xpath, wantXPath)
+	}
+}
+
 func TestSearcherGetAnnotations(t *testing.T) {
 	xmlData := `<?xml version="1.0" encoding="UTF-8"?>
 <edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
